@@ -1,0 +1,27 @@
+# build output
+anim/build/
+__pycache__/
+*.pyc
+
+# firmware images and keyboard backups: AULA's code / your keyboard's data, keep them out of the repo
+*.bin
+*.hex
+*.exe
+
+# flasher binary (download it from its own releases page)
+sinowisp
+
+# videos and audio played with live/stream_video.py: your own media, not part of the project
+*.mp4
+*.mkv
+*.webm
+*.mov
+*.avi
+*.m4v
+*.gif
+*.mp3
+*.wav
+*.ogg
+*.opus
+*.flac
+*.m4a

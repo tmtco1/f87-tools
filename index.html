@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>F87 Lighting</title>
+<meta name="description" content="Control the lighting of an AULA F87 keyboard from the browser over WebHID.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='1' y='3' width='14' height='10' fill='%23ddd6c8'/%3E%3Crect x='3' y='5' width='3' height='3' fill='%23201e1b'/%3E%3Crect x='7' y='5' width='3' height='3' fill='%23201e1b'/%3E%3Crect x='4' y='9' width='8' height='2' fill='%23201e1b'/%3E%3C/svg%3E">
+</head>
+<body>
+
+<header class="bar">
+  <h1>F87 Lighting</h1>
+  <p id="status" class="status" data-state="off" role="status" aria-live="polite">Not connected</p>
+  <button id="connect" type="button" class="primary">Connect keyboard</button>
+</header>
+
+<p id="unsupported" class="notice" hidden>
+  This browser has no WebHID, so it can't talk to the keyboard. Open this page in Chrome, Edge or Chromium
+  on a desktop.
+</p>
+
+<main>
+  <section id="intro" class="intro">
+    <p>Plug the F87 in with its USB cable (not 2.4&nbsp;GHz or Bluetooth), press Connect, and pick the
+    entry that lists a vendor-defined interface. The page reads the keyboard's own settings first, then every
+    change is written straight back.</p>
+  </section>
+
+  <fieldset id="keys-section" class="stage" disabled>
+    <legend>Per-key colours</legend>
+    <div id="board" class="board" aria-label="Keyboard"></div>
+    <div class="tools">
+      <label class="field">Colour
+        <input id="paint" type="color" value="#ff5a1f">
+      </label>
+      <label class="field">Profile
+        <select id="profile">
+          <option value="0">1</option><option value="1">2</option><option value="2">3</option>
+          <option value="3">4</option><option value="4">5</option>
+        </select>
+      </label>
+      <button id="fill" type="button">Fill all</button>
+      <button id="clear" type="button">Clear all</button>
+      <button id="reload" type="button">Reload from keyboard</button>
+      <button id="upload" type="button" class="primary">Upload &amp; show</button>
+    </div>
+    <p class="hint">Click or drag to paint, right-click a key to pick its colour. Painting only changes this page;
+    Upload &amp; show sends it to the keyboard. Only profile 1 has been tested.</p>
+  </fieldset>
+
+  <div class="cols">
+    <fieldset id="effect-section" disabled>
+      <legend>Built-in effect</legend>
+      <ol id="effects" class="effects"></ol>
+
+      <div class="param" id="p-brightness">
+        <label for="brightness">Brightness</label>
+        <input id="brightness" type="range" min="0" max="4" step="1" value="0">
+        <output for="brightness">0</output>
+      </div>
+      <div class="param" id="p-speed">
+        <label for="speed">Speed</label>
+        <input id="speed" type="range" min="0" max="4" step="1" value="0">
+        <output for="speed">0</output>
+      </div>
+      <div class="param" id="p-colour">
+        <span class="lbl" id="colour-lbl">Colour</span>
+        <div id="swatches" class="swatches" role="radiogroup" aria-labelledby="colour-lbl"></div>
+        <input id="slot-picker" type="color" tabindex="-1" aria-hidden="true">
+      </div>
+      <p class="hint" id="colour-hint">Select a colour slot; click the selected one again to change its colour.</p>
+    </fieldset>
+
+    <fieldset id="zone-section" disabled>
+      <legend>Light bar &amp; front light</legend>
+      <div id="zones"></div>
+    </fieldset>
+  </div>
+
+  <details class="advanced">
+    <summary>Advanced: raw commands and log</summary>
+    <fieldset id="raw-section" disabled>
+      <p class="hint">Raw writes go straight to the keyboard. A wrong config or palette write can reset your settings.</p>
+      <form id="raw-read" class="raw">
+        <label class="field">Command <input name="cmd" value="04" size="4" spellcheck="false"></label>
+        <label class="field">Arg <input name="arg" value="0" size="3" spellcheck="false"></label>
+        <label class="field">Bytes <input name="size" value="128" size="5" inputmode="numeric"></label>
+        <button type="submit">Raw read</button>
+      </form>
+      <form id="raw-write" class="raw">
+        <label class="field">Command <input name="cmd" value="04" size="4" spellcheck="false"></label>
+        <label class="field">Arg <input name="arg" value="0" size="3" spellcheck="false"></label>
+        <label class="field grow">Payload (hex) <input name="data" spellcheck="false" placeholder="5a a5 …"></label>
+        <button type="submit">Raw write</button>
+      </form>
+      <button id="dump" type="button">Dump config + palette</button>
+    </fieldset>
+    <div class="logbar"><span>Log</span><button id="clear-log" type="button" class="quiet">Clear log</button></div>
+    <pre id="log" class="log" tabindex="0" aria-label="Log"></pre>
+  </details>
+</main>
+
+<footer>
+  <p>Unofficial community project, not affiliated with or endorsed by AULA or BY Tech. AULA and F87 belong to their owners.
+  Provided as is, without warranty; sending commands to your keyboard is at your own risk. Targets USB 258a:010c only.
+  Settings stay in your browser. Full text in DISCLAIMER.md in the repository.</p>
+</footer>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
