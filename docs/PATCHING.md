@@ -7,6 +7,8 @@ You can get the firmwares from [f87fw/firmware](https://github.com/tmtco1/f87fw/
 - the **Bluetooth names** (BT 3.0 and BT 5.0 slots)
 - the **boot animation** (the power-on snake): disable it, change its speed, or replace it with
   one of the bundled animations or your own code
+- new **lighting effects**: Bad Apple (a video stored in flash) and Conway's Game of Life
+  ([CUSTOM_EFFECTS.md](CUSTOM_EFFECTS.md))
 
 It changes only a few bytes, checks each one first, and doesn't touch the bootloader or the ISP
 entry, so you can always flash the original back.
@@ -16,7 +18,7 @@ entry, so you can always flash the original back.
 ## Quick start
 
 ```sh
-python3 patch_firmware.py base_f87_decrypted.bin out.bin \
+python3 tools/patch_firmware.py base_f87_decrypted.bin out.bin \
     --product "My Keyboard" --bt-name "MyKB" --boot-anim fkeys
 ./sinowisp write -d aula-f87 --format bin out.bin
 ```
@@ -47,7 +49,7 @@ anything. The firmware image isn't part of this repo.
 ## Options
 
 ```
-patch_firmware.py IN.bin OUT.bin [options]
+tools/patch_firmware.py IN.bin OUT.bin [options]
 ```
 
 At least one option is needed; with none, the patcher exits with "nothing to change".
@@ -63,7 +65,7 @@ Both strings together must fit in 256 bytes (each takes 2 + 2 × length bytes, s
 characters each is fine).
 
 ```sh
-python3 patch_firmware.py base_f87_decrypted.bin out.bin --manufacturer "AULA" --product "F87 Custom"
+python3 tools/patch_firmware.py base_f87_decrypted.bin out.bin --manufacturer "AULA" --product "F87 Custom"
 lsusb | grep 258a     # after flashing and replugging
 ```
 
@@ -92,13 +94,13 @@ its radio module, so after flashing:
 | `--boot-step N` | ticks between animation steps, 1–255 (stock 1; bigger = slower) |
 | `--boot-fade N` | ticks between fade steps, 1–255 (stock 5; bigger = longer trail) |
 | `--boot-anim NAME` | replace the snake with a bundled animation |
-| `--boot-code IHX` | replace the snake with your own code (built with `anim/build.sh`) |
+| `--boot-code IHX` | replace the snake with your own code (built with `effects/anim/build.sh`) |
 
 `--boot-step` / `--boot-fade` work with the stock snake as well as with custom animations. For
 example, a slower snake with a longer trail:
 
 ```sh
-python3 patch_firmware.py base_f87_decrypted.bin out.bin --boot-step 3 --boot-fade 10
+python3 tools/patch_firmware.py base_f87_decrypted.bin out.bin --boot-step 3 --boot-fade 10
 ```
 
 Bundled animations (build them first):
@@ -111,8 +113,8 @@ Bundled animations (build them first):
 | `tmtco` | T, M, T, C, O light up in turn, then a ripple spreads out from O | 4 | 2 |
 
 ```sh
-anim/build.sh tmtco
-python3 patch_firmware.py base_f87_decrypted.bin out.bin --boot-anim tmtco
+effects/anim/build.sh tmtco
+python3 tools/patch_firmware.py base_f87_decrypted.bin out.bin --boot-anim tmtco
 ```
 
 Each preset sets its own step / fade; give `--boot-step` / `--boot-fade` to override them.
@@ -124,6 +126,18 @@ Rules:
   `--boot-fade` have no effect.
 
 Writing your own animation is covered in [BOOT_ANIMATIONS.md](BOOT_ANIMATIONS.md).
+
+### Custom lighting effects
+
+| Option | Effect |
+|---|---|
+| `--badapple` | add the Bad Apple effect as effect 6 (`effects/badapple/build/badapple.ihx`, built by `effects/badapple/build.py VIDEO`) |
+| `--life` | add the Game of Life effect as effect 9 (`effects/life/build/life.ihx`, built by `effects/life/build.py`) |
+| `--effect IHX` | add your own effect (repeatable) |
+
+They can all be used together; each one goes into its own empty effect slot (6, 9, 14). With `--life`,
+the USB names share their area with it and get 64 bytes (2 + 2 × length per name). See
+[CUSTOM_EFFECTS.md](CUSTOM_EFFECTS.md) and [BADAPPLE.md](BADAPPLE.md).
 
 ### Other
 
@@ -138,8 +152,8 @@ Writing your own animation is covered in [BOOT_ANIMATIONS.md](BOOT_ANIMATIONS.md
 Everything at once:
 
 ```sh
-anim/build.sh fkeys
-python3 patch_firmware.py base_f87_decrypted.bin out.bin \
+effects/anim/build.sh fkeys
+python3 tools/patch_firmware.py base_f87_decrypted.bin out.bin \
     --manufacturer "AULA" --product "F87 White" \
     --bt3-name "F87 BT3" --bt5-name "F87 BT5" \
     --boot-anim fkeys --boot-step 6
@@ -152,7 +166,7 @@ USB manufacturer -> 'AULA' at 0xee00 (10 bytes)
 USB product      -> 'F87 White' at 0xee0a (20 bytes)
 BT  bt3          -> 'F87 BT3'
 BT  bt5          -> 'F87 BT5'
-boot animation -> anim/build/boot_fkeys.ihx (93 bytes at 0xec80), called from 0x1d52
+boot animation -> effects/anim/build/boot_fkeys.ihx (93 bytes at 0xec80), called from 0x1d52
 boot animation step period -> 6 ticks (was 1)
 boot animation fade period -> 1 ticks (was 5)
 wrote out.bin: 149 bytes changed, all in ['0x1d00', '0x4000', '0x4100', '0xa000', '0xad00', '0xec00', '0xee00']
@@ -224,7 +238,7 @@ The power-on snake is lighting mode `0x26`, driven by the frame handler at `0x1D
 | `0x1D52` | `LCALL 0x8B26` (snake step) | `LCALL 0xEC80` for a custom animation |
 
 Custom animation code goes into `0xEC80–0xEDFF` (384 bytes, unused by the firmware). It must start
-at `0xEC80`; `anim/build.sh` takes care of that.
+at `0xEC80`; `effects/anim/build.sh` takes care of that.
 
 ### Checks before writing
 
@@ -244,7 +258,7 @@ If anything fails, nothing is written.
 | Message / symptom | Cause | Fix |
 |---|---|---|
 | `input is not the known base_f87_decrypted.bin` | wrong or already patched image | use the original decrypted image |
-| `anim/build/<name>.ihx not built yet` | the preset isn't compiled | run `anim/build.sh <name>` (needs SDCC) |
+| `effects/anim/build/<name>.ihx not built yet` | the preset isn't compiled | run `effects/anim/build.sh <name>` (needs SDCC) |
 | `nothing to change` | no option given | add at least one option |
 | `Bluetooth name must be 1..13 ASCII characters` | name too long or non-ASCII | shorten it |
 | `AssertionError: unexpected ...` | image differs from the analysed build (with `--force`) | this image isn't supported |

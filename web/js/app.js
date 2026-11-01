@@ -3,6 +3,7 @@ import {
 } from "./constants.js";
 import { Device, slotOffset, palOffset } from "./device-config.js";
 import { hex } from "./hid-transport.js";
+import { initFirmware } from "./fw-ui.js";
 
 const $ = (s, r = document) => r.querySelector(s);
 
@@ -170,7 +171,7 @@ for (const [key, title] of zoneDefs) {
   wrap.dataset.zone = key;
   const opts = (arr) => arr.map((t, i) => `<option value="${i}">${t}</option>`).join("");
   wrap.innerHTML = `
-    <h3>${title}</h3>
+    <h2>${title}</h2>
     <label class="field">Mode <select data-f="0">${opts(ZONE_MODES)}</select></label>
     <label class="field">Colour <select data-f="1">${opts(ZONE_COLORS)}</select></label>
     <div class="param"><label>Brightness</label><input type="range" min="0" max="4" step="1" data-f="2"><output></output></div>
@@ -331,6 +332,20 @@ $("#dump").addEventListener("click", () =>
     log(`config\n${hex(cfg)}\n\npalette\n${hex(pal)}`);
   })
 );
+$("#factory-reset").addEventListener("click", () => {
+  if (!confirm("Reset all lighting settings to factory defaults? Your effects, colours and per-key profiles will be lost.")) return;
+  run("Factory reset", async (d) => {
+    setStatus("busy", "Resetting…");
+    state.cfg = await d.factoryReset();
+    state.pal = await d.readPalette();
+    state.keyColors = await d.readKeyColors(state.profile);
+    renderEffect();
+    renderZones();
+    renderKeys();
+    setStatus("ok", "Lighting reset to factory defaults");
+    log("Factory reset: config, palette and per-key profiles 1-5 restored");
+  });
+});
 $("#clear-log").addEventListener("click", () => (logEl.textContent = ""));
 
 // ---------- connection ----------
@@ -383,14 +398,25 @@ async function connect() {
   }
 }
 
+// ---------- firmware ----------
+const startFirmwarePanel = () => initFirmware();
+
 function init() {
   setEnabled(false);
   if (!("hid" in navigator)) {
+    const insecure = !window.isSecureContext;
+    $("#unsupported").textContent = insecure
+      ? `WebHID only works on secure pages, and this one was opened as ${location.origin}. Open it over https, ` +
+        "or from http://localhost / http://127.0.0.1 on the computer the keyboard is plugged into."
+      : "This browser has no WebHID, so it can't talk to the keyboard. Open this page in Chrome, Edge or " +
+        "another Chromium-based browser on a desktop (some privacy browsers turn WebHID off).";
     $("#unsupported").hidden = false;
     $("#connect").disabled = true;
-    setStatus("error", "WebHID not available");
+    setStatus("error", insecure ? "WebHID needs https or localhost" : "WebHID not available");
+    startFirmwarePanel();   // patching and downloading still work
     return;
   }
+  startFirmwarePanel();
   $("#connect").addEventListener("click", connect);
   navigator.hid.addEventListener("disconnect", (ev) => {
     if (state.dev && ev.device === state.dev.hid) {

@@ -1,10 +1,10 @@
 #!/bin/sh
 # Build a boot animation into an Intel HEX blob located at 0xEC80 (no C runtime, no startup code).
 #
-# usage: anim/build.sh [file.c | name] [extra sdcc options...]
-#   anim/build.sh                          -> anim/boot_fkeys.c
-#   anim/build.sh wipe                     -> anim/build/wipe.ihx
-#   anim/build.sh boot_fkeys -DTAIL_STEPS=10
+# usage: effects/anim/build.sh [file.c | name] [extra sdcc options...]
+#   effects/anim/build.sh                          -> effects/anim/boot_fkeys.c
+#   effects/anim/build.sh wipe                     -> effects/anim/build/wipe.ihx
+#   effects/anim/build.sh boot_fkeys -DTAIL_STEPS=10
 set -e
 cd "$(dirname "$0")"
 src=${1:-boot_fkeys}; [ $# -gt 0 ] && shift
@@ -46,5 +46,5 @@ for line in open(sys.argv[1]):
         a = r[1] << 8 | r[2]; addrs += range(a, a + r[0])
 if not addrs or min(addrs) != 0xEC80 or max(addrs) >= 0xEE00:
     sys.exit(f"error: code must lie in 0xEC80-0xEDFF (384 bytes) (got {min(addrs):#06x}-{max(addrs):#06x})")
-print(f"built anim/{sys.argv[1]} ({len(addrs)} bytes at 0xEC80-{max(addrs):#06x}, {0xEE00 - 1 - max(addrs)} bytes left)")
+print(f"built effects/anim/{sys.argv[1]} ({len(addrs)} bytes at 0xEC80-{max(addrs):#06x}, {0xEE00 - 1 - max(addrs)} bytes left)")
 EOF

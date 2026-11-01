@@ -20,6 +20,17 @@ export const KEYDATA_LEN = PLANE * 3 + 6;
 
 export const CUSTOM_EFFECT = 21;
 
+// Factory defaults from the base F87 firmware (what holding Fn+Esc for 3 s restores): LED config =
+// flash 0xC400, palette = flash 0xC800, per-key colours = blue on Esc, WASD and the arrows in all 5
+// groups. Keymaps and macros are not covered.
+const fromHexStr = (h) => Uint8Array.from(h.match(/../g).map((x) => parseInt(x, 16)));
+export const DEFAULT_CONFIG = fromHexStr(
+  "000303020000040407000b200100000000000100020100ff0200000001000401000000000000000000000000000000000000000000000000ffff04370437043704370437043704370437043704370437043704370437043704370437043704370437074707470744074407440744074407440744040404040404040404045aa5");
+export const DEFAULT_PALETTE = fromHexStr(
+  "ff000000ff000000ffffff00ff00ff00ffffffffff".repeat(23) + "03000000009200001000000000000000000000000000005aa500100000");
+export const DEFAULT_BLUE_KEYS = [0, 9, 14, 15, 21, 89, 94, 95, 101];
+export const KEEP_ON_RESET = [0x0c, 0x0e];   // the firmware's own reset keeps these config bytes
+
 // id, name, speed, brightness, colour  (capabilities from aulaf87.py / KB.ini)
 export const EFFECTS = [
   [0, "Off", 0, 0, 0],
@@ -28,19 +39,19 @@ export const EFFECTS = [
   [3, "Rainbow", 1, 1, 0],
   [4, "Flash away", 1, 1, 1],
   [5, "Raindrops", 1, 1, 1],
-  [6, "Rainbow wheel", 1, 1, 1],
+  [6, "Empty (Bad Apple if patched)", 1, 1, 1],
   [7, "Ripples", 1, 1, 1],
   [8, "Stars twinkle", 1, 1, 1],
-  [9, "Shadow disappear", 1, 1, 1],
+  [9, "Empty (Life if patched)", 1, 1, 1],
   [10, "Retro snake", 1, 1, 1],
   [11, "Neon stream", 1, 1, 1],
   [12, "Reaction", 1, 1, 1],
   [13, "Sine wave", 1, 1, 1],
-  [14, "Scanning", 1, 1, 1],
+  [14, "Empty", 0, 0, 0],
   [15, "Rotating windmill", 1, 1, 0],
   [16, "Colorful waterfall", 1, 1, 0],
   [17, "Blossoming", 1, 1, 0],
-  [18, "Rotating storm", 1, 1, 1],
+  [18, "Empty", 0, 0, 0],
   [21, "Custom (per-key)", 0, 0, 0],
 ].map(([id, name, speed, brightness, colour]) => ({ id, name, speed, brightness, colour }));
 

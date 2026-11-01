@@ -1,6 +1,6 @@
 # Live lighting: video on the AULA F87's keys
 
-`live/stream_video.py` plays any video on the keyboard's backlight, in real time over USB. It can
+`tools/live/stream_video.py` plays any video on the keyboard's backlight, in real time over USB. It can
 open the same video in a window on your PC, with sound, in sync with the keys.
 
 It works on the **stock firmware**, with nothing flashed. The keyboard already has a live
@@ -31,8 +31,8 @@ frames to it. The same channel works for anything else you want to draw on the k
 Connect the keyboard **by cable**, with the switch on the back at **USB**, then:
 
 ```sh
-python3 live/stream_video.py --test                         # once: check the key layout
-python3 live/stream_video.py your_video.mp4 --show --audio  # keys + window + sound
+python3 tools/live/stream_video.py --test                         # once: check the key layout
+python3 tools/live/stream_video.py your_video.mp4 --show --audio  # keys + window + sound
 ```
 
 Press Ctrl-C to stop. The keys go dark, and shortly afterwards the keyboard returns to its normal
@@ -105,7 +105,7 @@ When playback ends, the tool prints a summary, for example:
 ## Checking the key layout (`--test`)
 
 ```sh
-python3 live/stream_video.py --test
+python3 tools/live/stream_video.py --test
 ```
 
 The tool lights the 87 keys one at a time, left to right and row by row, and prints each key's

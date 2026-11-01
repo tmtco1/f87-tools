@@ -44,14 +44,14 @@ You need Python 3, SDCC (`sudo dnf install sdcc`, `sudo apt install sdcc`, …),
 decrypted base firmware.
 
 ```sh
-cp anim/boot_fkeys.c anim/my_anim.c          # start from a working animation
-$EDITOR anim/my_anim.c
+cp effects/anim/boot_fkeys.c effects/anim/my_anim.c          # start from a working animation
+$EDITOR effects/anim/my_anim.c
 
-anim/build.sh my_anim                        # -> anim/build/my_anim.ihx
-python3 -I anim/test/sim_boot.py anim/build/my_anim.ihx 30     # check it frame by frame
+effects/anim/build.sh my_anim                        # -> effects/anim/build/my_anim.ihx
+python3 -I tests/sim_boot.py effects/anim/build/my_anim.ihx 30     # check it frame by frame
 
-python3 patch_firmware.py base_f87_decrypted.bin out.bin \
-    --boot-code anim/build/my_anim.ihx --boot-step 8 --boot-fade 1
+python3 tools/patch_firmware.py base_f87_decrypted.bin out.bin \
+    --boot-code effects/anim/build/my_anim.ihx --boot-step 8 --boot-fade 1
 ./sinowisp write -d aula-f87 --format bin out.bin
 ```
 
@@ -246,7 +246,7 @@ columns the Shift row reads:
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | **row 4** | LShift | X | C | V | B | N | M | , | . | / | – | – | Z | RShift | – | Up | – |
 
-This is the firmware's own mapping, and it's verified on a real F87: `live/stream_video.py --test`
+This is the firmware's own mapping, and it's verified on a real F87: `tools/live/stream_video.py --test`
 lights every key in LED order and each one matched its name. If you
 light Shift-row keys individually, look up the LED column the way the stock firmware does, with a
 macro that reads the firmware's own table:
@@ -344,7 +344,7 @@ of its way. `build.sh` enforces the first two rules and refuses to build otherwi
 
 ## Walkthrough: `boot_fkeys.c`
 
-`anim/boot_fkeys.c` is the shipped animation: a full-white light running across F1–F12.
+`effects/anim/boot_fkeys.c` is the shipped animation: a full-white light running across F1–F12.
 
 ```c
 void boot_step(void)
@@ -386,8 +386,8 @@ The constants (`FIRST_COL`, `NKEYS`, `TAIL_STEPS`, `ROW`, `R_VAL`, `G_VAL`, `B_V
 `#ifndef`, so you can change them at build time without editing the file:
 
 ```sh
-anim/build.sh boot_fkeys -DR_VAL=0 -DG_VAL=0x80 -DB_VAL=0xFF     # light blue instead of white
-anim/build.sh boot_fkeys -DROW=1 -DFIRST_COL=1 -DNKEYS=12        # run across 1 .. = instead
+effects/anim/build.sh boot_fkeys -DR_VAL=0 -DG_VAL=0x80 -DB_VAL=0xFF     # light blue instead of white
+effects/anim/build.sh boot_fkeys -DROW=1 -DFIRST_COL=1 -DNKEYS=12        # run across 1 .. = instead
 ```
 
 ---
@@ -454,7 +454,7 @@ It also shows three timing tricks:
   lighting starts from a dark keyboard.
 
 Build-time settings: `LETTER_GAP` (10), `RING_GAP` (3), `TAIL_RINGS` (4), `BLACK_GAP` (20) and
-`COLOUR_R/G/B` (white), e.g. `anim/build.sh tmtco -DRING_GAP=2 -DBLACK_GAP=30`.
+`COLOUR_R/G/B` (white), e.g. `effects/anim/build.sh tmtco -DRING_GAP=2 -DBLACK_GAP=30`.
 
 Preset: `--boot-anim tmtco` (step 4, fade 2): about four times as long as the stock snake.
 
@@ -474,14 +474,14 @@ Preset: `--boot-anim tmtco` (step 4, fade 2): about four times as long as the st
 ## Building
 
 ```sh
-anim/build.sh                          # builds anim/boot_fkeys.c
-anim/build.sh my_anim                  # builds anim/my_anim.c
-anim/build.sh wipe                     # builds anim/wipe.c
-anim/build.sh path/to/other.c          # paths are relative to anim/
-anim/build.sh my_anim -DNKEYS=6        # extra arguments go to sdcc
+effects/anim/build.sh                          # builds effects/anim/boot_fkeys.c
+effects/anim/build.sh my_anim                  # builds effects/anim/my_anim.c
+effects/anim/build.sh wipe                     # builds effects/anim/wipe.c
+effects/anim/build.sh path/to/other.c          # paths are relative to anim/
+effects/anim/build.sh my_anim -DNKEYS=6        # extra arguments go to sdcc
 ```
 
-Output goes to `anim/build/<name>.ihx` (plus `.asm`, `.lst`, `.map` and `.sym` for inspection).
+Output goes to `effects/anim/build/<name>.ihx` (plus `.asm`, `.lst`, `.map` and `.sym` for inspection).
 `build.sh`:
 
 1. compiles with `sdcc -mmcs51 --model-small --opt-code-size`
@@ -492,13 +492,13 @@ Output goes to `anim/build/<name>.ihx` (plus `.asm`, `.lst`, `.map` and `.sym` f
 
 On Fedora the tools are installed as `sdcc-sdcc` / `sdcc-sdld`; `build.sh` finds either name.
 
-To see what the compiler produced, read `anim/build/<name>.asm`.
+To see what the compiler produced, read `effects/anim/build/<name>.asm`.
 
 ---
 
 ## Testing in the simulator
 
-`anim/test/sim_boot.py` runs your blob in uCsim (the 8051 simulator that comes with SDCC). For
+`tests/sim_boot.py` runs your blob in uCsim (the 8051 simulator that comes with SDCC). For
 every frame count N it:
 
 1. clears XRAM
@@ -507,10 +507,10 @@ every frame count N it:
 4. prints which LEDs are lit, in which colour, and the values of `POS` / `RUN`
 
 ```sh
-python3 -I anim/test/sim_boot.py anim/build/my_anim.ihx 30
+python3 -I tests/sim_boot.py effects/anim/build/my_anim.ihx 30
 
 # if your code reads firmware tables (LED_COL, the colour wheel, ...), load the firmware underneath:
-python3 -I anim/test/sim_boot.py anim/build/my_anim.ihx 30 --firmware base_f87_decrypted.bin
+python3 -I tests/sim_boot.py effects/anim/build/my_anim.ihx 30 --firmware base_f87_decrypted.bin
 ```
 
 Keys are printed by name. Positions with no key name, and the remapped Shift row, are printed as
@@ -541,8 +541,8 @@ What the simulator doesn't show:
 ## Patching and flashing
 
 ```sh
-python3 patch_firmware.py base_f87_decrypted.bin out.bin \
-    --boot-code anim/build/my_anim.ihx --boot-step 8 --boot-fade 1
+python3 tools/patch_firmware.py base_f87_decrypted.bin out.bin \
+    --boot-code effects/anim/build/my_anim.ihx --boot-step 8 --boot-fade 1
 ```
 
 You can combine this with the other options (`--product`, `--manufacturer`, `--bt-name`, …).
@@ -570,14 +570,14 @@ Every animation in `anim/` is available as a preset with its own default timing:
 
 | Preset | File | step | fade |
 |---|---|---|---|
-| `fkeys` | `anim/boot_fkeys.c` | 8 | 1 |
-| `wipe` | `anim/wipe.c` | 6 | 2 |
-| `rainbow_frow` | `anim/rainbow_frow.c` | 8 | 1 |
-| `tmtco` | `anim/tmtco.c` | 4 | 2 |
+| `fkeys` | `effects/anim/boot_fkeys.c` | 8 | 1 |
+| `wipe` | `effects/anim/wipe.c` | 6 | 2 |
+| `rainbow_frow` | `effects/anim/rainbow_frow.c` | 8 | 1 |
+| `tmtco` | `effects/anim/tmtco.c` | 4 | 2 |
 
 ```sh
-anim/build.sh wipe
-python3 patch_firmware.py base_f87_decrypted.bin out.bin --boot-anim wipe
+effects/anim/build.sh wipe
+python3 tools/patch_firmware.py base_f87_decrypted.bin out.bin --boot-anim wipe
 ```
 
 To add your own, put an entry in `BOOT_ANIMS` in `patch_firmware.py`:
@@ -585,7 +585,7 @@ To add your own, put an entry in `BOOT_ANIMS` in `patch_firmware.py`:
 ```python
 BOOT_ANIMS = {
     ...
-    "my_anim": {"ihx": "anim/build/my_anim.ihx", "step": 8, "fade": 1,
+    "my_anim": {"ihx": "effects/anim/build/my_anim.ihx", "step": 8, "fade": 1,
                 "about": "what it looks like, shown in --help"},
 }
 ```

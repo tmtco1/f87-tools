@@ -58,22 +58,34 @@ EFFECTS = {
     3: ("rainbow", 1, 1, 0),
     4: ("flash-away", 1, 1, 1),
     5: ("raindrops", 1, 1, 1),
-    6: ("rainbow-wheel", 1, 1, 1),
+    6: ("badapple", 1, 1, 1),           # empty on the stock F87; Bad Apple with patch_firmware.py --badapple
     7: ("ripples", 1, 1, 1),
     8: ("stars", 1, 1, 1),
-    9: ("shadow-disappear", 1, 1, 1),
+    9: ("life", 1, 1, 1),               # empty on the stock F87; Game of Life with patch_firmware.py --life
     10: ("retro-snake", 1, 1, 1),
     11: ("neon-stream", 1, 1, 1),
     12: ("reaction", 1, 1, 1),
     13: ("sine-wave", 1, 1, 1),
-    14: ("scanning", 1, 1, 1),
+    14: ("scanning", 1, 1, 1),           # empty on the F87
     15: ("windmill", 1, 1, 0),
     16: ("waterfall", 1, 1, 0),
     17: ("blossoming", 1, 1, 0),
-    18: ("storm", 1, 1, 1),
+    18: ("storm", 1, 1, 1),              # empty on the F87
     21: ("custom", 0, 0, 0),
 }
 CUSTOM_EFFECT = 21
+
+# Factory defaults, from the base F87 firmware (what holding Fn+Esc for 3 s restores):
+#   LED config = flash 0xC400, palette = flash 0xC800, per-key colours = blue on the keys flagged
+#   at 0xCB7A (Esc, WASD, arrows) in all 5 colour groups. Keymaps and macros are not covered.
+DEFAULT_CONFIG = bytes.fromhex(
+    "000303020000040407000b200100000000000100020100ff0200000001000401000000000000000000000000"
+    "000000000000000000000000ffff043704370437043704370437043704370437043704370437043704370437"
+    "04370437043704370437074707470744074407440744074407440744040404040404040404045aa5")
+DEFAULT_PALETTE = (bytes.fromhex("ff000000ff000000ffffff00ff00ff00ffffffffff") * 23 + bytes.fromhex(
+    "03000000009200001000000000000000000000000000005aa500100000"))
+DEFAULT_BLUE_KEYS = (0, 9, 14, 15, 21, 89, 94, 95, 101)
+KEEP_ON_RESET = (0x0C, 0x0E)        # the firmware's reset keeps these config bytes (XRAM 0x0315, 0x0317)
 
 # Extra light zones in the LED config (mapped on the keyboard with the Fn shortcuts).
 # Front zone brightness/speed are inferred from the bar's layout.
@@ -199,6 +211,19 @@ class Keyboard:
             data[idx], data[PLANE + idx], data[2 * PLANE + idx] = r, g, b
         self.write(CMD_KEYCOLOR, bytes(data), group)
 
+    def factory_reset(self):
+        """Restore the factory lighting: palette, all 5 per-key colour groups, LED config."""
+        self.set_palette(DEFAULT_PALETTE)
+        time.sleep(0.05)
+        for group in range(5):
+            self.set_key_colors({i: (0, 0, 0xFF) for i in DEFAULT_BLUE_KEYS}, group)
+            time.sleep(0.05)
+        cfg = bytearray(DEFAULT_CONFIG)
+        cur = self.get_config()
+        for i in KEEP_ON_RESET:
+            cfg[i] = cur[i]
+        self.set_config(cfg)
+
     def set_effect(self, effect, brightness=None, speed=None, color=None, rainbow=False):
         """color: (r, g, b) written into palette slot 0 of this effect."""
         cfg = self.get_config()
@@ -281,6 +306,9 @@ def main():
     p.add_argument("-b", "--brightness", type=level)
     p.add_argument("-s", "--speed", type=level)
 
+    p = sub.add_parser("reset", help="factory reset of the lighting (effects, colours, light bar)")
+    p.add_argument("-y", "--yes", action="store_true", help="don't ask for confirmation")
+
     p = sub.add_parser("raw", help="send a raw write command")
     p.add_argument("command", type=lambda s: int(s, 0))
     p.add_argument("hexdata")
@@ -322,6 +350,12 @@ def main():
         elif a.cmd == "light":
             kb.set_zone(a.zone, ZONE_MODES.get(a.mode), ZONE_COLORS.get(a.color),
                         a.brightness, a.speed)
+        elif a.cmd == "reset":
+            if not a.yes and input("Reset all lighting settings to factory defaults? [y/N] ").strip().lower() != "y":
+                print("cancelled")
+                return
+            kb.factory_reset()
+            print("lighting reset to factory defaults (keymaps and macros unchanged; Fn+Esc for 3 s resets those too)")
         elif a.cmd == "raw":
             kb.write(a.command, bytes.fromhex(a.hexdata), a.arg)
     finally:

@@ -83,6 +83,81 @@
     </fieldset>
   </div>
 
+  <section id="fw-section" class="fw" aria-labelledby="fw-title">
+    <h2 id="fw-title" class="fw-title">Firmware</h2>
+    <p class="hint fw-lead">Build a patched firmware here, then flash it with <a href="https://github.com/karstx/sinowisp">sinowisp</a>
+    on Windows, macOS or Linux. Everything happens in this page; nothing is uploaded.</p>
+
+    <div class="fw-steps">
+      <section class="fw-step">
+        <h3><span class="n">1</span>Firmware</h3>
+        <div class="tools">
+          <button id="fw-get" type="button">Get base firmware</button>
+          <label class="filebtn">Open .bin file<input id="fw-open" type="file" accept=".bin,application/octet-stream"></label>
+        </div>
+        <p id="fw-id" class="fw-id">Get the AULA F87 base firmware from
+        <a href="https://github.com/tmtco1/f87fw">tmtco1/f87fw</a>, or open a firmware file, such as a backup of your keyboard.</p>
+        <details class="fw-help">
+          <summary>Back up your keyboard first</summary>
+          <p>Read your keyboard's current firmware once and keep the file. Flashing it back restores everything,
+          including your settings and key assignments:</p>
+          <pre>sinowisp read -d aula-f87 --format bin f87_backup.bin</pre>
+          <p>You can also open the backup here and patch it: your settings and key assignments are kept.</p>
+        </details>
+      </section>
+
+      <fieldset id="fw-options" class="fw-step" disabled>
+        <legend class="sr">Patches</legend>
+        <h3 aria-hidden="true"><span class="n">2</span>Patches</h3>
+        <div class="fw-grid">
+          <label class="field">USB manufacturer <input id="fw-manufacturer" placeholder="BY Tech" maxlength="60" spellcheck="false"></label>
+          <label class="field">USB product <input id="fw-product" placeholder="Gaming Keyboard" maxlength="60" spellcheck="false"></label>
+          <label class="field">Bluetooth 3.0 name <input id="fw-bt3" placeholder="AULA-F87 3.0" maxlength="13" spellcheck="false"></label>
+          <label class="field">Bluetooth 5.0 name <input id="fw-bt5" placeholder="AULA-F87 5.0" maxlength="13" spellcheck="false"></label>
+          <label class="field wide">Boot animation
+            <select id="fw-boot"><option value="">Stock snake</option><option value="off">Off</option></select>
+          </label>
+        </div>
+        <div class="fw-fx">
+          <label class="check"><input id="fw-life" type="checkbox"> Game of Life as effect 9</label>
+          <label id="fw-badapple-row" class="check" hidden><input id="fw-badapple" type="checkbox"> Bad Apple as effect 6</label>
+          <label class="filebtn">Add effect .ihx<input id="fw-fx" type="file" accept=".ihx,.hex" multiple></label>
+          <ul id="fw-fx-list" class="fw-fx-list"></ul>
+        </div>
+        <p class="hint">Empty fields keep the original. Custom effects are built with the scripts in this repository, for
+        example <code>effects/badapple/build.py</code>; the effect slot (6, 9 or 14) is part of the file.</p>
+      </fieldset>
+
+      <section class="fw-step">
+        <h3><span class="n">3</span>Download &amp; flash</h3>
+        <p id="fw-summary" class="fw-summary"></p>
+        <div class="tools">
+          <button id="fw-download" type="button" class="primary" disabled>Download f87_patched.bin</button>
+        </div>
+        <p id="fw-status" class="fw-status" role="status" aria-live="polite"></p>
+        <ol class="fw-flash">
+          <li>Download sinowisp for your system from its
+          <a href="https://github.com/karstx/sinowisp/releases/latest">releases page</a> (Windows, macOS, Linux) and unpack it.</li>
+          <li>Plug the keyboard in by USB cable, then run, in the folder with both files:
+            <pre id="fw-cmd">sinowisp write -d aula-f87 --format bin f87_patched.bin</pre>
+          </li>
+          <li>Wait until it says it's done (about 30 seconds) before unplugging. The keyboard restarts by itself.</li>
+        </ol>
+        <details class="fw-help">
+          <summary>Notes per system</summary>
+          <p><b>Windows:</b> run <code>sinowisp.exe write …</code> in a terminal opened in that folder.</p>
+          <p><b>macOS:</b> run <code>./sinowisp write …</code>. If macOS blocks the download, allow it under
+          System Settings → Privacy &amp; Security.</p>
+          <p><b>Linux:</b> run <code>./sinowisp write …</code>. Without root it needs access to both USB IDs, e.g. this udev rule:</p>
+          <pre>SUBSYSTEMS=="usb|hidraw", ATTRS{idVendor}=="258a", MODE="0666", TAG+="uaccess"
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="0603", ATTRS{idProduct}=="1020", MODE="0666", TAG+="uaccess"</pre>
+          <p><b>If flashing stops halfway:</b> the keyboard stays in its bootloader. Run the same command again, or flash
+          your backup.</p>
+        </details>
+      </section>
+    </div>
+  </section>
+
   <details class="advanced">
     <summary>Advanced: raw commands and log</summary>
     <fieldset id="raw-section" disabled>
@@ -100,6 +175,10 @@
         <button type="submit">Raw write</button>
       </form>
       <button id="dump" type="button">Dump config + palette</button>
+      <button id="factory-reset" type="button">Factory reset lighting</button>
+      <p class="hint">Factory reset restores the lighting the keyboard shipped with: effects, colours, all 5
+      per-key profiles, light bar and front light. Key assignments and macros are not changed; hold Fn+Esc for
+      3 seconds on the keyboard to reset those too.</p>
     </fieldset>
     <div class="logbar"><span>Log</span><button id="clear-log" type="button" class="quiet">Clear log</button></div>
     <pre id="log" class="log" tabindex="0" aria-label="Log"></pre>

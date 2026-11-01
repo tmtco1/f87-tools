@@ -3,7 +3,7 @@
 buffers after each frame.
 
 For frame count N it runs: clear XRAM, set up the boot state (what 0xB1B3 does), then N x LCALL 0xEC80.
-usage: sim_boot.py anim/build/boot_fkeys.ihx [frames] [--firmware base_f87_decrypted.bin]
+usage: sim_boot.py effects/anim/build/boot_fkeys.ihx [frames] [--firmware base_f87_decrypted.bin]
 """
 import re
 import shutil
@@ -19,7 +19,7 @@ import os
 import tempfile
 
 ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-ap.add_argument("ihx", help="animation built by anim/build.sh")
+ap.add_argument("ihx", help="animation built by effects/anim/build.sh")
 ap.add_argument("frames", nargs="?", type=int, default=40)
 ap.add_argument("--firmware", metavar="BIN",
                 help="load this firmware image (e.g. base_f87_decrypted.bin) underneath, so reads of "
@@ -41,7 +41,7 @@ if args.firmware:
         f.write(":00000001FF\n")
 # LED grid (col, row) -> key name for the AULA F87 (ANSI, checked against a photo of the board).
 # Rows 0-3 and 5 match the keymap; row 4 is in LED order (Z sits at LED column 12, see docs).
-# The whole mapping is verified on the keyboard with live/stream_video.py --test.
+# The whole mapping is verified on the keyboard with tools/live/stream_video.py --test.
 GRID = [
     "Esc  -    F1   F2   F3   F4   F5   F6   F7   F8   F9   F10  F11  F12  PrtS ScrL Paus",
     "`    1    2    3    4    5    6    7    8    9    0    -    =    Bksp Ins  Home PgUp",

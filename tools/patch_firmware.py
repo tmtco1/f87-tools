@@ -7,6 +7,9 @@ BT:  0xA063 copies a 13-byte name into the packet sent to the radio module. The 
      and both length immediates are set to the new length (the rest of the packet is zero-filled by the
      original code).
 
+Custom lighting effects: --badapple (effect 6, a video stored in flash), --life (effect 9, Game of Life),
+or --effect IHX for your own; see docs/CUSTOM_EFFECTS.md.
+
 Boot animation (power-on snake, lighting mode 0x26): can be disabled, or its snake-step and fade
 periods (in timer ticks) changed.
 
@@ -44,15 +47,26 @@ BOOT_STEP_IMM = 0x1D25     # SUBB A,#1 : advance the snake one key every N ticks
 BOOT_STEP_CALL = 0x1D52    # LCALL 0x8B26 (snake step) -> LCALL <custom animation entry>
 CODE_AREA = (0xEC80, 0xEE00)   # 384 free bytes in the sector holding the firmware's own code (0xEC00-0xEC64)
 
-# Custom boot animations: anim/<file>.c built with anim/build.sh, plus their recommended timing
+# Custom lighting effects (docs/CUSTOM_EFFECTS.md): blobs with a 10-byte header
+#   +0 LJMP init, +3 LJMP frame, +6 LJMP next (0x1B0E, patched to chain), +9 mode
+# installed into the effect slots the stock firmware leaves empty.
+EFFECT_AREAS = [(0xDC00, 0xEC00), (0xEE00, 0xEFFB)]   # free flash; the second one shares 0xEE00 with the USB strings
+EFFECT_INIT = 0x179C        # default target of the effect-init switch (0x175B, ?C?CCASE table): 0x1B0E
+EFFECT_INIT_NEXT = 0x1B0E
+FRAME_TABLE = 0x1B37        # LJMP per mode 0..0x11; empty slots hold LJMP 0x1DC8 (a RET)
+EFFECT_SLOTS = {6: 0x4F78, 9: 0x4F82, 14: 0x4F8C}   # mode -> Fn "next effect" skip (CJNE A,#mode)
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))     # repo root (tools/ is one below)
+EFFECT_PRESETS = {"badapple": "effects/badapple/build/badapple.ihx", "life": "effects/life/build/life.ihx"}
+
+# Custom boot animations: anim/<file>.c built with effects/anim/build.sh, plus their recommended timing
 BOOT_ANIMS = {
-    "fkeys": {"ihx": "anim/build/boot_fkeys.ihx", "step": 8, "fade": 1,
+    "fkeys": {"ihx": "effects/anim/build/boot_fkeys.ihx", "step": 8, "fade": 1,
               "about": "full-white light sweeping F1..F12"},
-    "wipe": {"ihx": "anim/build/wipe.ihx", "step": 6, "fade": 2,
+    "wipe": {"ihx": "effects/anim/build/wipe.ihx", "step": 6, "fade": 2,
              "about": "white wipe across the whole keyboard, column by column"},
-    "rainbow_frow": {"ihx": "anim/build/rainbow_frow.ihx", "step": 8, "fade": 1,
+    "rainbow_frow": {"ihx": "effects/anim/build/rainbow_frow.ihx", "step": 8, "fade": 1,
                      "about": "F1..F12 one by one, a different colour per key"},
-    "tmtco": {"ihx": "anim/build/tmtco.ihx", "step": 4, "fade": 2,
+    "tmtco": {"ihx": "effects/anim/build/tmtco.ihx", "step": 4, "fade": 2,
               "about": "T, M, T, C, O light up in turn, then a ripple spreads out from O"},
 }
 
@@ -102,7 +116,13 @@ def main():
                     help="replace the snake with a custom animation: "
                          + "; ".join(f"{k} = {v['about']}" for k, v in BOOT_ANIMS.items()))
     ap.add_argument("--boot-code", metavar="IHX",
-                    help="replace the snake step with your own code (Intel HEX built by anim/build.sh, entry 0xEC80)")
+                    help="replace the snake step with your own code (Intel HEX built by effects/anim/build.sh, entry 0xEC80)")
+    ap.add_argument("--effect", action="append", default=[], metavar="IHX",
+                    help="add a custom lighting effect (repeatable), see docs/CUSTOM_EFFECTS.md")
+    ap.add_argument("--badapple", action="store_true",
+                    help=f"add the Bad Apple effect (6): --effect {EFFECT_PRESETS['badapple']}")
+    ap.add_argument("--life", action="store_true",
+                    help=f"add the Game of Life effect (9): --effect {EFFECT_PRESETS['life']}")
     ap.add_argument("--force", action="store_true", help="skip the input image hash check")
     a = ap.parse_args()
 
@@ -126,8 +146,43 @@ def main():
     assert fw[BOOT_FLAG_SET:BOOT_FLAG_SET + 2] == b"\xd2\x33", "unexpected boot flag instruction"
     assert fw[BOOT_FADE_IMM - 1:BOOT_FADE_IMM + 1] == b"\x94\x05", "unexpected boot fade instruction"
     assert fw[BOOT_STEP_IMM - 1:BOOT_STEP_IMM + 1] == b"\x94\x01", "unexpected boot step instruction"
+    assert fw[EFFECT_INIT:EFFECT_INIT + 2] == bytes([EFFECT_INIT_NEXT >> 8, EFFECT_INIT_NEXT & 0xFF]), \
+        "unexpected effect-init default"
+    for mode, skip in EFFECT_SLOTS.items():
+        entry = FRAME_TABLE + 3 * mode
+        assert fw[entry:entry + 3] == b"\x02\x1d\xc8", f"unexpected frame entry for mode {mode}"
+        assert fw[skip:skip + 2] == bytes([0xB4, mode]), f"unexpected Fn skip for mode {mode}"
     if any(fw[STR_AREA:STR_AREA_END]) or fw[0xEFFB:0xEFFE] != b"\0\0\0":
         sys.exit("string area / reset-vector slot not empty")
+
+    # custom lighting effects: load and check them first (the USB strings must stay below them)
+    paths = list(a.effect) + [os.path.join(ROOT, EFFECT_PRESETS[k]) for k in EFFECT_PRESETS if getattr(a, k)]
+    effects = []
+    for path in paths:
+        if not os.path.exists(path):
+            build = {"badapple": "effects/badapple/build.py VIDEO", "life": "effects/life/build.py"}
+            hint = next((build[k] for k, v in EFFECT_PRESETS.items() if path.endswith(v)), "its build script")
+            sys.exit(f"{os.path.relpath(path)} not found: run {hint} first")
+        code = load_ihx(path)
+        lo, hi = min(code), max(code)
+        if not any(s <= lo and hi < e for s, e in EFFECT_AREAS):
+            sys.exit(f"{path}: must lie in one of " + ", ".join(f"{s:#06x}-{e - 1:#06x}" for s, e in EFFECT_AREAS)
+                     + f" (got {lo:#06x}-{hi:#06x})")
+        hdr = [code.get(lo + i) for i in range(10)]
+        if hdr[0] != 0x02 or hdr[3] != 0x02 or hdr[6] != 0x02 or (hdr[7] << 8 | hdr[8]) != EFFECT_INIT_NEXT:
+            sys.exit(f"{path}: doesn't start with the effect header (LJMP init, LJMP frame, LJMP 0x1B0E, mode)")
+        mode = hdr[9]
+        if mode not in EFFECT_SLOTS:
+            sys.exit(f"{path}: effect slot {mode} isn't free (free slots: {sorted(EFFECT_SLOTS)})")
+        if any(mode == m for _, _, m, _ in effects):
+            sys.exit(f"two effects for slot {mode}")
+        for other_lo, other_hi, _, other in effects:
+            if lo <= other_hi and other_lo <= hi:
+                sys.exit(f"{path} overlaps {other}")
+        if any(fw[lo:hi + 1]):
+            sys.exit(f"{path}: flash at {lo:#06x}-{hi:#06x} not empty")
+        effects.append((lo, hi, mode, path))
+    str_end = min([STR_AREA_END] + [lo for lo, _, _, _ in effects if lo >= STR_AREA])
 
     # USB strings
     cursor = STR_AREA
@@ -135,8 +190,9 @@ def main():
         if text is None:
             continue
         desc = usb_string_descriptor(text)
-        if cursor + len(desc) > STR_AREA_END:
-            sys.exit("USB strings don't fit in the string area")
+        if cursor + len(desc) > str_end:
+            sys.exit(f"USB strings don't fit in the string area ({str_end - STR_AREA} bytes"
+                     + (", the rest holds a custom effect)" if str_end < STR_AREA_END else ")"))
         fw[cursor:cursor + len(desc)] = desc
         for hi, lo, ln, _, _ in USB_SITES[key]:
             fw[hi], fw[lo], fw[ln] = cursor >> 8, cursor & 0xFF, len(desc)
@@ -163,10 +219,10 @@ def main():
     code_path = a.boot_code
     if a.boot_anim:
         preset = BOOT_ANIMS[a.boot_anim]
-        code_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), preset["ihx"])
+        code_path = os.path.join(ROOT, preset["ihx"])
         if not os.path.exists(code_path):
             src = os.path.basename(preset["ihx"])[:-4]
-            sys.exit(f"{preset['ihx']} not built yet: run anim/build.sh {src} first")
+            sys.exit(f"{preset['ihx']} not built yet: run effects/anim/build.sh {src} first")
         if a.boot_step is None:
             a.boot_step = preset["step"]
         if a.boot_fade is None:
@@ -198,6 +254,21 @@ def main():
             sys.exit(f"--boot-{name} must be 1..255")
         fw[addr] = val
         print(f"boot animation {name} period -> {val} ticks (was {orig[addr]})")
+
+    # install the custom effects, each one's init chained to the next one's
+    for i, (lo, hi, mode, path) in enumerate(effects):
+        code = load_ihx(path)
+        for addr, b in code.items():
+            fw[addr] = b
+        if i + 1 < len(effects):
+            nxt = effects[i + 1][0]
+            fw[lo + 7], fw[lo + 8] = nxt >> 8, nxt & 0xFF
+        entry = FRAME_TABLE + 3 * mode
+        fw[entry + 1], fw[entry + 2] = (lo + 3) >> 8, (lo + 3) & 0xFF
+        fw[EFFECT_SLOTS[mode] + 1] = 0xFF
+        print(f"effect {mode:2d}      -> {os.path.relpath(path)} ({len(code)} bytes at {lo:#06x}-{hi:#06x})")
+    if effects:
+        fw[EFFECT_INIT], fw[EFFECT_INIT + 1] = effects[0][0] >> 8, effects[0][0] & 0xFF
 
     if fw == bytearray(orig):
         sys.exit("nothing to change (give at least one option)")

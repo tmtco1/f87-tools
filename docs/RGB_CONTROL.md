@@ -5,7 +5,7 @@ colours, effect colours, and the light bar / front light. It talks to the stock 
 using the same protocol as AULA's Windows software (`OemDrv.exe`, class `CDevG5KB`), reverse
 engineered and checked on the keyboard.
 
-For video or animations streamed live to the keys, use `live/stream_video.py` instead
+For video or animations streamed live to the keys, use `tools/live/stream_video.py` instead
 (see [LIVE_LIGHTING.md](LIVE_LIGHTING.md)).
 
 ---
@@ -29,7 +29,7 @@ The tool finds the keyboard automatically. Use `--device /dev/hidrawN` to pick a
 ## Commands
 
 ```
-aulaf87.py [--device /dev/hidrawN] {list,info,dump,effect,custom,light,raw} ...
+tools/aulaf87.py [--device /dev/hidrawN] {list,info,dump,effect,custom,light,reset,raw} ...
 ```
 
 | Command | What it does |
@@ -40,14 +40,15 @@ aulaf87.py [--device /dev/hidrawN] {list,info,dump,effect,custom,light,raw} ...
 | `effect` | Select a built-in effect, with brightness, speed and colour |
 | `custom` | Set per-key colours and switch to the custom effect |
 | `light` | Control the light bar or the front light |
+| `reset` | Factory reset of all lighting settings |
 | `raw` | Send a raw write command (for experiments) |
 
 ### `effect`
 
 ```sh
-python3 aulaf87.py effect breathing -b 4 -s 2 -c 00aaff   # blue breathing, full brightness
-python3 aulaf87.py effect ripples -r                      # ripples in multicolour
-python3 aulaf87.py effect off
+python3 tools/aulaf87.py effect breathing -b 4 -s 2 -c 00aaff   # blue breathing, full brightness
+python3 tools/aulaf87.py effect ripples -r                      # ripples in multicolour
+python3 tools/aulaf87.py effect off
 ```
 
 | Option | Values |
@@ -66,25 +67,25 @@ python3 aulaf87.py effect off
 | 3 | `rainbow` | ✓ | ✓ | |
 | 4 | `flash-away` | ✓ | ✓ | ✓ |
 | 5 | `raindrops` | ✓ | ✓ | ✓ |
-| 6 | `rainbow-wheel` | ✓ | ✓ | ✓ |
+| 6 | `badapple`: only with the Bad Apple firmware ([BADAPPLE.md](BADAPPLE.md)); empty on stock firmware | ✓ | ✓ | |
 | 7 | `ripples` | ✓ | ✓ | ✓ |
 | 8 | `stars` | ✓ | ✓ | ✓ |
-| 9 | `shadow-disappear` | ✓ | ✓ | ✓ |
+| 9 | `life`: only with the Game of Life firmware ([CUSTOM_EFFECTS.md](CUSTOM_EFFECTS.md)); empty on stock firmware | ✓ | ✓ | |
 | 10 | `retro-snake` | ✓ | ✓ | ✓ |
 | 11 | `neon-stream` (factory default) | ✓ | ✓ | ✓ |
 | 12 | `reaction` | ✓ | ✓ | ✓ |
 | 13 | `sine-wave` | ✓ | ✓ | ✓ |
-| 14 | `scanning` | ✓ | ✓ | ✓ |
+| 14 | `scanning`: empty on the F87 (no code in the firmware) | | | |
 | 15 | `windmill` | ✓ | ✓ | |
 | 16 | `waterfall` | ✓ | ✓ | |
 | 17 | `blossoming` | ✓ | ✓ | |
-| 18 | `storm` | ✓ | ✓ | ✓ |
+| 18 | `storm`: empty on the F87 (no code in the firmware) | | | |
 | 21 | `custom` (per-key colours) | | | |
 
 ### `custom`
 
 ```sh
-python3 aulaf87.py custom --all 202020 w=ff0000 a=ff0000 s=ff0000 d=ff0000 esc=00ff00
+python3 tools/aulaf87.py custom --all 202020 w=ff0000 a=ff0000 s=ff0000 d=ff0000 esc=00ff00
 ```
 
 - `--all RRGGBB` sets every key first; `KEY=RRGGBB` pairs then override single keys.
@@ -99,8 +100,8 @@ fn menu rctrl left down right`
 ### `light`
 
 ```sh
-python3 aulaf87.py light bar -m breathing -c cyan -b 3 -s 2
-python3 aulaf87.py light front -m off
+python3 tools/aulaf87.py light bar -m breathing -c cyan -b 3 -s 2
+python3 tools/aulaf87.py light front -m off
 ```
 
 | Option | Values |
@@ -111,12 +112,29 @@ python3 aulaf87.py light front -m off
 | `-b`, `--brightness` | 0–4 |
 | `-s`, `--speed` | 0–4 |
 
+### `reset`
+
+```sh
+python3 tools/aulaf87.py reset       # asks first; -y / --yes skips the question
+```
+
+Puts the lighting back the way the keyboard shipped: the LED config (effect Neon stream, light bar
+and front light on rainbow, every effect's brightness, speed and colour), the effect colour palette,
+and all 5 per-key colour profiles (blue Esc, WASD and arrows). It writes the same defaults the
+firmware's own reset copies from its flash (LED config at `0xC400`, palette at `0xC800`), and keeps
+the two config bytes the firmware's reset keeps (`0x0C`, `0x0E`).
+
+Key assignments and macros are not changed (none of these tools change them). Holding **Fn + Esc for
+3 seconds** on the keyboard resets everything, those included. There is no USB command for that: the
+firmware's command handler only accepts data writes (`0x03`–`0x0A`), so this tool restores the
+lighting by writing the defaults itself.
+
 ### `info`, `dump`, `raw`
 
 ```sh
-python3 aulaf87.py info        # e.g. "model id 0x8F (AULA F87), firmware 12.00"
-python3 aulaf87.py dump        # LED config + palette as hex
-python3 aulaf87.py raw 0x04 "<hex bytes>" --arg 0
+python3 tools/aulaf87.py info        # e.g. "model id 0x8F (AULA F87), firmware 12.00"
+python3 tools/aulaf87.py dump        # LED config + palette as hex
+python3 tools/aulaf87.py raw 0x04 "<hex bytes>" --arg 0
 ```
 
 `raw` writes the given bytes with any command. Use it only if you know what the command does
@@ -128,7 +146,7 @@ python3 aulaf87.py raw 0x04 "<hex bytes>" --arg 0
 
 - **Changes are stored on the keyboard.** Effects, colours and per-key colours survive a replug.
   Each write makes the keys blink briefly while the firmware saves and restarts its lighting, so
-  don't use these commands for animations (use the live mode in `live/stream_video.py`).
+  don't use these commands for animations (use the live mode in `tools/live/stream_video.py`).
 - **Firmware quirk: the effect id must change.** After a config write, the firmware only
   restarts its lighting if the effect id changed. A write that only changes brightness, speed or
   the extra zones would turn every light off until replug. The tool handles this by briefly

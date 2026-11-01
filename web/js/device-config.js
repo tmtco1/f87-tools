@@ -1,5 +1,6 @@
 import {
   CMD_LED, CMD_KEYCOLOR, CMD_PALETTE, CFG_LEN, PAL_LEN, PLANE, KEYDATA_LEN, CUSTOM_EFFECT, KEYS,
+  DEFAULT_CONFIG, DEFAULT_PALETTE, DEFAULT_BLUE_KEYS, KEEP_ON_RESET,
 } from "./constants.js";
 import { Transport, sleep } from "./hid-transport.js";
 
@@ -124,6 +125,24 @@ export class Device {
       const next = Uint8Array.from(await this.#getConfig());
       next[0x09] = 1;
       next[0x0a] = CUSTOM_EFFECT;
+      return this.#putConfig(next);
+    });
+  }
+
+  /** Factory lighting: palette, all 5 per-key colour groups, then the LED config. Returns the new config. */
+  factoryReset() {
+    return this.exclusive(async () => {
+      await this.t.write(CMD_PALETTE, Uint8Array.from(DEFAULT_PALETTE));
+      await sleep(50);
+      const keys = new Uint8Array(KEYDATA_LEN);
+      for (const i of DEFAULT_BLUE_KEYS) keys[2 * PLANE + i] = 0xff;
+      for (let group = 0; group < 5; group++) {
+        await this.t.write(CMD_KEYCOLOR, keys, group);
+        await sleep(50);
+      }
+      const cur = await this.#getConfig();
+      const next = Uint8Array.from(DEFAULT_CONFIG);
+      for (const i of KEEP_ON_RESET) next[i] = cur[i];
       return this.#putConfig(next);
     });
   }
